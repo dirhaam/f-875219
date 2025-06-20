@@ -9,6 +9,36 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      footer_content: {
+        Row: {
+          column_order: number | null
+          column_title: string
+          created_at: string
+          id: string
+          is_enabled: boolean | null
+          links: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          column_order?: number | null
+          column_title: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean | null
+          links?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          column_order?: number | null
+          column_title?: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean | null
+          links?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           created_at: string
@@ -61,6 +91,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      landing_content: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          is_enabled: boolean | null
+          section_name: string
+          section_order: number | null
+          subtitle: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean | null
+          section_name: string
+          section_order?: number | null
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean | null
+          section_name?: string
+          section_order?: number | null
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       orders: {
         Row: {
@@ -207,6 +273,66 @@ export type Database = {
           is_active?: boolean | null
           name?: string
           price?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          created_at: string
+          id: string
+          setting_key: string
+          setting_value: Json | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          setting_key: string
+          setting_value?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          setting_key?: string
+          setting_value?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      testimonials: {
+        Row: {
+          company: string | null
+          created_at: string
+          customer_name: string
+          customer_position: string | null
+          id: string
+          is_featured: boolean | null
+          rating: number | null
+          testimonial: string
+          updated_at: string
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          customer_name: string
+          customer_position?: string | null
+          id?: string
+          is_featured?: boolean | null
+          rating?: number | null
+          testimonial: string
+          updated_at?: string
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          customer_name?: string
+          customer_position?: string | null
+          id?: string
+          is_featured?: boolean | null
+          rating?: number | null
+          testimonial?: string
           updated_at?: string
         }
         Relationships: []

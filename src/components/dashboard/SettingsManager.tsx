@@ -6,10 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
-import { Settings, Mail, FileText, Globe, Users } from 'lucide-react';
+import { Settings, Mail, Building, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
 const SettingsManager = () => {
@@ -19,20 +18,27 @@ const SettingsManager = () => {
     queryKey: ['settings'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('settings')
-        .select('*')
-        .single();
+        .from('settings' as any)
+        .select('*');
       
-      if (error && error.code !== 'PGRST116') throw error;
-      return data || {};
+      if (error) throw error;
+      
+      // Convert array to object for easier access
+      const settingsObj: any = {};
+      data?.forEach((setting: any) => {
+        settingsObj[setting.setting_key] = setting.setting_value;
+      });
+      
+      return settingsObj;
     }
   });
 
-  const updateSettingsMutation = useMutation({
-    mutationFn: async (settingsData: any) => {
+  const updateSettingMutation = useMutation({
+    mutationFn: async ({ key, value }: { key: string; value: any }) => {
       const { error } = await supabase
-        .from('settings')
-        .upsert([settingsData]);
+        .from('settings' as any)
+        .update({ setting_value: value, updated_at: new Date().toISOString() })
+        .eq('setting_key', key);
       
       if (error) throw error;
     },
@@ -45,39 +51,50 @@ const SettingsManager = () => {
     }
   });
 
-  const handleEmailSettingsSubmit = (e: React.FormEvent) => {
+  const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
     
-    const emailSettings = {
-      id: settings?.id || '1',
+    const emailConfig = {
       smtp_host: formData.get('smtp_host'),
-      smtp_port: parseInt(formData.get('smtp_port') as string),
-      smtp_username: formData.get('smtp_username'),
+      smtp_port: formData.get('smtp_port'),
+      smtp_user: formData.get('smtp_user'),
       smtp_password: formData.get('smtp_password'),
       from_email: formData.get('from_email'),
-      from_name: formData.get('from_name'),
-      email_enabled: formData.get('email_enabled') === 'on'
+      from_name: formData.get('from_name')
     };
 
-    updateSettingsMutation.mutate(emailSettings);
+    updateSettingMutation.mutate({ key: 'email_config', value: emailConfig });
   };
 
-  const handleCompanySettingsSubmit = (e: React.FormEvent) => {
+  const handleCompanySubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
     
-    const companySettings = {
-      id: settings?.id || '1',
-      company_name: formData.get('company_name'),
-      company_address: formData.get('company_address'),
-      company_phone: formData.get('company_phone'),
-      company_email: formData.get('company_email'),
-      company_website: formData.get('company_website'),
+    const companyInfo = {
+      name: formData.get('company_name'),
+      address: formData.get('company_address'),
+      phone: formData.get('company_phone'),
+      email: formData.get('company_email'),
+      website: formData.get('company_website'),
       tax_number: formData.get('tax_number')
     };
 
-    updateSettingsMutation.mutate(companySettings);
+    updateSettingMutation.mutate({ key: 'company_info', value: companyInfo });
+  };
+
+  const handleInvoiceSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const formData = new FormData(e.target as HTMLFormElement);
+    
+    const invoiceConfig = {
+      prefix: formData.get('invoice_prefix'),
+      tax_rate: parseFloat(formData.get('tax_rate') as string) || 0,
+      payment_terms: formData.get('payment_terms'),
+      notes: formData.get('invoice_notes')
+    };
+
+    updateSettingMutation.mutate({ key: 'invoice_config', value: invoiceConfig });
   };
 
   if (isLoading) {
@@ -94,7 +111,7 @@ const SettingsManager = () => {
         <Settings className="h-6 w-6" />
         <div>
           <h2 className="text-2xl font-bold text-foreground">Pengaturan Sistem</h2>
-          <p className="text-muted-foreground">Kelola pengaturan aplikasi dan konfigurasi</p>
+          <p className="text-muted-foreground">Kelola konfigurasi email, perusahaan, dan invoice</p>
         </div>
       </div>
 
@@ -105,11 +122,11 @@ const SettingsManager = () => {
             Email
           </TabsTrigger>
           <TabsTrigger value="company" className="gap-2">
-            <FileText className="h-4 w-4" />
+            <Building className="h-4 w-4" />
             Perusahaan
           </TabsTrigger>
           <TabsTrigger value="invoice" className="gap-2">
-            <Globe className="h-4 w-4" />
+            <FileText className="h-4 w-4" />
             Invoice
           </TabsTrigger>
         </TabsList>
@@ -117,75 +134,67 @@ const SettingsManager = () => {
         <TabsContent value="email">
           <Card>
             <CardHeader>
-              <CardTitle>Pengaturan Email SMTP</CardTitle>
+              <CardTitle>Konfigurasi Email SMTP</CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleEmailSettingsSubmit} className="space-y-4">
-                <div className="flex items-center space-x-2 mb-4">
-                  <Switch 
-                    name="email_enabled" 
-                    defaultChecked={settings?.email_enabled ?? false} 
-                  />
-                  <Label>Aktifkan Email SMTP</Label>
-                </div>
-                
+              <form onSubmit={handleEmailSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>SMTP Host</Label>
                     <Input 
                       name="smtp_host" 
-                      defaultValue={settings?.smtp_host}
-                      placeholder="smtp.gmail.com" 
+                      defaultValue={settings?.email_config?.smtp_host || ''} 
+                      placeholder="smtp.gmail.com"
                     />
                   </div>
                   <div>
                     <Label>SMTP Port</Label>
                     <Input 
                       name="smtp_port" 
-                      type="number" 
-                      defaultValue={settings?.smtp_port || 587}
+                      type="number"
+                      defaultValue={settings?.email_config?.smtp_port || ''} 
+                      placeholder="587"
                     />
                   </div>
                 </div>
-                
                 <div>
-                  <Label>Username/Email</Label>
+                  <Label>SMTP Username</Label>
                   <Input 
-                    name="smtp_username" 
-                    defaultValue={settings?.smtp_username}
-                    type="email" 
+                    name="smtp_user" 
+                    defaultValue={settings?.email_config?.smtp_user || ''} 
+                    placeholder="your-email@gmail.com"
                   />
                 </div>
-                
                 <div>
-                  <Label>Password</Label>
+                  <Label>SMTP Password</Label>
                   <Input 
                     name="smtp_password" 
-                    type="password" 
-                    defaultValue={settings?.smtp_password}
+                    type="password"
+                    defaultValue={settings?.email_config?.smtp_password || ''} 
+                    placeholder="your-app-password"
                   />
                 </div>
-                
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>From Email</Label>
                     <Input 
                       name="from_email" 
-                      type="email" 
-                      defaultValue={settings?.from_email}
+                      type="email"
+                      defaultValue={settings?.email_config?.from_email || ''} 
+                      placeholder="noreply@company.com"
                     />
                   </div>
                   <div>
                     <Label>From Name</Label>
                     <Input 
                       name="from_name" 
-                      defaultValue={settings?.from_name}
+                      defaultValue={settings?.email_config?.from_name || ''} 
+                      placeholder="Company Name"
                     />
                   </div>
                 </div>
-                
                 <Button type="submit" className="w-full">
-                  Simpan Pengaturan Email
+                  Simpan Konfigurasi Email
                 </Button>
               </form>
             </CardContent>
@@ -198,58 +207,61 @@ const SettingsManager = () => {
               <CardTitle>Informasi Perusahaan</CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleCompanySettingsSubmit} className="space-y-4">
+              <form onSubmit={handleCompanySubmit} className="space-y-4">
                 <div>
                   <Label>Nama Perusahaan</Label>
                   <Input 
                     name="company_name" 
-                    defaultValue={settings?.company_name}
-                    required 
+                    defaultValue={settings?.company_info?.name || ''} 
+                    placeholder="PT. Digital Service Indonesia"
+                    required
                   />
                 </div>
-                
                 <div>
                   <Label>Alamat</Label>
                   <Textarea 
                     name="company_address" 
-                    defaultValue={settings?.company_address}
+                    defaultValue={settings?.company_info?.address || ''} 
+                    placeholder="Jl. Sudirman No. 123, Jakarta"
                   />
                 </div>
-                
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Telepon</Label>
                     <Input 
                       name="company_phone" 
-                      defaultValue={settings?.company_phone}
+                      defaultValue={settings?.company_info?.phone || ''} 
+                      placeholder="+62 21 1234 5678"
                     />
                   </div>
                   <div>
                     <Label>Email</Label>
                     <Input 
                       name="company_email" 
-                      type="email" 
-                      defaultValue={settings?.company_email}
+                      type="email"
+                      defaultValue={settings?.company_info?.email || ''} 
+                      placeholder="info@company.com"
                     />
                   </div>
                 </div>
-                
-                <div>
-                  <Label>Website</Label>
-                  <Input 
-                    name="company_website" 
-                    defaultValue={settings?.company_website}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Website</Label>
+                    <Input 
+                      name="company_website" 
+                      defaultValue={settings?.company_info?.website || ''} 
+                      placeholder="https://company.com"
+                    />
+                  </div>
+                  <div>
+                    <Label>NPWP</Label>
+                    <Input 
+                      name="tax_number" 
+                      defaultValue={settings?.company_info?.tax_number || ''} 
+                      placeholder="12.345.678.9-012.000"
+                    />
+                  </div>
                 </div>
-                
-                <div>
-                  <Label>NPWP/Tax Number</Label>
-                  <Input 
-                    name="tax_number" 
-                    defaultValue={settings?.tax_number}
-                  />
-                </div>
-                
                 <Button type="submit" className="w-full">
                   Simpan Informasi Perusahaan
                 </Button>
@@ -261,30 +273,50 @@ const SettingsManager = () => {
         <TabsContent value="invoice">
           <Card>
             <CardHeader>
-              <CardTitle>Pengaturan Invoice</CardTitle>
+              <CardTitle>Konfigurasi Invoice</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <Label>Template Invoice</Label>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Konfigurasi tampilan dan format invoice PDF
-                  </p>
-                  <Button variant="outline" className="w-full">
-                    Kelola Template Invoice
-                  </Button>
+              <form onSubmit={handleInvoiceSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Prefix Invoice</Label>
+                    <Input 
+                      name="invoice_prefix" 
+                      defaultValue={settings?.invoice_config?.prefix || 'INV'} 
+                      placeholder="INV"
+                    />
+                  </div>
+                  <div>
+                    <Label>Tax Rate (%)</Label>
+                    <Input 
+                      name="tax_rate" 
+                      type="number"
+                      step="0.01"
+                      defaultValue={settings?.invoice_config?.tax_rate || 0} 
+                      placeholder="11"
+                    />
+                  </div>
                 </div>
-                
                 <div>
-                  <Label>Prefix Invoice</Label>
-                  <Input defaultValue="INV-" placeholder="INV-" />
+                  <Label>Payment Terms</Label>
+                  <Input 
+                    name="payment_terms" 
+                    defaultValue={settings?.invoice_config?.payment_terms || '30 days'} 
+                    placeholder="30 days"
+                  />
                 </div>
-                
                 <div>
-                  <Label>Nomor Urut Berikutnya</Label>
-                  <Input type="number" defaultValue="1001" />
+                  <Label>Default Notes</Label>
+                  <Textarea 
+                    name="invoice_notes" 
+                    defaultValue={settings?.invoice_config?.notes || ''} 
+                    placeholder="Terima kasih atas kepercayaan Anda"
+                  />
                 </div>
-              </div>
+                <Button type="submit" className="w-full">
+                  Simpan Konfigurasi Invoice
+                </Button>
+              </form>
             </CardContent>
           </Card>
         </TabsContent>
