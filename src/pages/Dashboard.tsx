@@ -9,6 +9,8 @@ import OrdersManager from '@/components/dashboard/OrdersManager';
 import ServicesManager from '@/components/dashboard/ServicesManager';
 import PortfolioManager from '@/components/dashboard/PortfolioManager';
 import InvoicesManager from '@/components/dashboard/InvoicesManager';
+import ContentManager from '@/components/dashboard/ContentManager';
+import SettingsManager from '@/components/dashboard/SettingsManager';
 import DashboardOverview from '@/components/dashboard/DashboardOverview';
 import { User } from '@supabase/supabase-js';
 
@@ -76,6 +78,10 @@ const Dashboard = () => {
         return <PortfolioManager />;
       case 'invoices':
         return <InvoicesManager />;
+      case 'content':
+        return <ContentManager />;
+      case 'settings':
+        return <SettingsManager />;
       default:
         return <DashboardOverview />;
     }

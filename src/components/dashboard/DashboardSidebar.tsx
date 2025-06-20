@@ -7,7 +7,8 @@ import {
   Briefcase, 
   FolderOpen, 
   FileText,
-  Settings
+  Settings,
+  Globe
 } from 'lucide-react';
 
 interface DashboardSidebarProps {
@@ -22,6 +23,8 @@ const DashboardSidebar = ({ activeTab, setActiveTab }: DashboardSidebarProps) =>
     { id: 'services', label: 'Layanan', icon: Briefcase },
     { id: 'portfolio', label: 'Portfolio', icon: FolderOpen },
     { id: 'invoices', label: 'Invoice', icon: FileText },
+    { id: 'content', label: 'Konten', icon: Globe },
+    { id: 'settings', label: 'Pengaturan', icon: Settings },
   ];
 
   return (

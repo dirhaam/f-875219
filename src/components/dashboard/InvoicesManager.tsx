@@ -8,8 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, FileText, Eye, Send, DollarSign } from 'lucide-react';
+import { Plus, FileText, Eye, Send, DollarSign, Download } from 'lucide-react';
 import { toast } from 'sonner';
+import { generateInvoicePDF } from '@/utils/invoicePdfGenerator';
 
 const InvoicesManager = () => {
   const queryClient = useQueryClient();
@@ -146,6 +147,45 @@ const InvoicesManager = () => {
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const handleDownloadPDF = async (invoice: any) => {
+    try {
+      const invoiceData = {
+        invoice_number: invoice.invoice_number,
+        issue_date: invoice.issue_date,
+        due_date: invoice.due_date,
+        customer: {
+          name: invoice.orders?.customer_name || '',
+          email: invoice.orders?.customer_email || '',
+        },
+        company: {
+          name: 'Digital Service Company',
+          address: 'Jl. Digital No. 123, Jakarta',
+          phone: '+62 21 1234567',
+          email: 'info@digitalservice.com',
+          website: 'www.digitalservice.com',
+          tax_number: '12.345.678.9-012.345'
+        },
+        items: [{
+          description: invoice.orders?.services?.name || 'Digital Service',
+          quantity: 1,
+          price: invoice.subtotal,
+          total: invoice.subtotal
+        }],
+        subtotal: invoice.subtotal,
+        tax_amount: invoice.tax_amount || 0,
+        total_amount: invoice.total_amount,
+        notes: invoice.notes,
+        payment_terms: invoice.payment_terms || '30 days'
+      };
+
+      await generateInvoicePDF(invoiceData);
+      toast.success('PDF invoice berhasil diunduh');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Gagal mengunduh PDF invoice');
+    }
   };
 
   if (isLoading) {
@@ -286,6 +326,16 @@ const InvoicesManager = () => {
                 <Button variant="outline" size="sm" className="gap-2">
                   <Eye className="h-4 w-4" />
                   Preview
+                </Button>
+
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-2"
+                  onClick={() => handleDownloadPDF(invoice)}
+                >
+                  <Download className="h-4 w-4" />
+                  PDF
                 </Button>
 
                 <Button variant="outline" size="sm" className="gap-2">
