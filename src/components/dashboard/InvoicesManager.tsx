@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -40,7 +39,8 @@ const InvoicesManager = () => {
   const { data: orders } = useQuery({
     queryKey: ['orders-for-invoice'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get all orders that are completed
+      const { data: completedOrders, error: ordersError } = await supabase
         .from('orders')
         .select(`
           id,
@@ -48,11 +48,24 @@ const InvoicesManager = () => {
           customer_email,
           services (name, price)
         `)
-        .eq('status', 'completed')
-        .is('id', null, { referencedTable: 'invoices' });
+        .eq('status', 'completed');
       
-      if (error) throw error;
-      return data;
+      if (ordersError) throw ordersError;
+
+      // Then get all order IDs that already have invoices
+      const { data: invoicedOrders, error: invoicesError } = await supabase
+        .from('invoices')
+        .select('order_id');
+      
+      if (invoicesError) throw invoicesError;
+
+      // Filter out orders that already have invoices
+      const invoicedOrderIds = invoicedOrders?.map(inv => inv.order_id) || [];
+      const availableOrders = completedOrders?.filter(order => 
+        !invoicedOrderIds.includes(order.id)
+      ) || [];
+      
+      return availableOrders;
     }
   });
 
