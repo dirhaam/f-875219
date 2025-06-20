@@ -166,11 +166,11 @@ const OrderForm = ({ onClose }: OrderFormProps) => {
                 <SelectValue placeholder="Pilih budget range" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="< 5 juta">< 5 juta</SelectItem>
+                <SelectItem value="< 5 juta">&lt; 5 juta</SelectItem>
                 <SelectItem value="5 - 10 juta">5 - 10 juta</SelectItem>
                 <SelectItem value="10 - 25 juta">10 - 25 juta</SelectItem>
                 <SelectItem value="25 - 50 juta">25 - 50 juta</SelectItem>
-                <SelectItem value="> 50 juta">> 50 juta</SelectItem>
+                <SelectItem value="> 50 juta">&gt; 50 juta</SelectItem>
               </SelectContent>
             </Select>
           </div>
