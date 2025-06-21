@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Eye, Send, Download, Copy, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import InvoiceAdjustmentDialog from './InvoiceAdjustmentDialog';
+import InvoicePreviewDialog from './InvoicePreviewDialog';
 
 interface InvoiceData {
   id: string;
@@ -19,6 +20,7 @@ interface InvoiceData {
   notes?: string;
   is_downpayment: boolean;
   downpayment_percentage?: number;
+  payment_terms?: string;
   orders?: {
     customer_name: string;
     customer_email: string;
@@ -141,10 +143,7 @@ const InvoiceCard = ({ invoice, onStatusUpdate, onDownloadPDF, onAdjustment }: I
             </SelectContent>
           </Select>
 
-          <Button variant="outline" size="sm" className="gap-2">
-            <Eye className="h-4 w-4" />
-            Preview
-          </Button>
+          <InvoicePreviewDialog invoice={invoice} />
 
           <Button 
             variant="outline" 
