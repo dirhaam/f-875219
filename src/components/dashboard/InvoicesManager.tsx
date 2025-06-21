@@ -1,11 +1,12 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, FileText } from 'lucide-react';
+import { Plus, FileText, Filter, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { generateInvoicePDF } from '@/utils/invoicePdfGenerator';
 import InvoiceForm from '@/components/invoice/InvoiceForm';
@@ -14,6 +15,9 @@ import InvoiceCard from '@/components/invoice/InvoiceCard';
 const InvoicesManager = () => {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
 
   const { data: invoices, isLoading } = useQuery({
     queryKey: ['invoices'],
@@ -116,6 +120,27 @@ const InvoicesManager = () => {
     }
   });
 
+  const handleInvoiceAdjustment = async (adjustment: any) => {
+    try {
+      const { error } = await supabase
+        .from('invoices')
+        .update({
+          subtotal: adjustment.newSubtotal,
+          total_amount: adjustment.newTotal,
+          notes: `${adjustment.description}${adjustment.reason ? ` - ${adjustment.reason}` : ''}`
+        })
+        .eq('id', adjustment.invoiceId);
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast.success('Invoice adjustment applied successfully');
+    } catch (error) {
+      console.error('Adjustment error:', error);
+      toast.error('Failed to apply adjustment');
+    }
+  };
+
   const handleDownloadPDF = async (invoice: any) => {
     try {
       const invoiceData = {
@@ -155,6 +180,17 @@ const InvoicesManager = () => {
     }
   };
 
+  const filteredInvoices = invoices?.filter(invoice => {
+    const matchesSearch = invoice.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         invoice.orders?.customer_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
+    const matchesType = typeFilter === 'all' || 
+                       (typeFilter === 'downpayment' && invoice.is_downpayment) ||
+                       (typeFilter === 'full' && !invoice.is_downpayment);
+    
+    return matchesSearch && matchesStatus && matchesType;
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -191,8 +227,50 @@ const InvoicesManager = () => {
         </Dialog>
       </div>
 
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4 items-center">
+        <div className="flex items-center gap-2">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search invoices..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-64"
+          />
+        </div>
+        
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-32">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="sent">Sent</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-32">
+            <SelectValue placeholder="Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="full">Full Payment</SelectItem>
+            <SelectItem value="downpayment">Downpayment</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Filter className="h-4 w-4" />
+          {filteredInvoices?.length || 0} of {invoices?.length || 0} invoices
+        </div>
+      </div>
+
       <div className="grid gap-4">
-        {invoices?.map((invoice) => (
+        {filteredInvoices?.map((invoice) => (
           <InvoiceCard 
             key={invoice.id}
             invoice={invoice}
@@ -200,16 +278,25 @@ const InvoicesManager = () => {
               updateInvoiceStatusMutation.mutate({ invoiceId, status })
             }
             onDownloadPDF={handleDownloadPDF}
+            onAdjustment={handleInvoiceAdjustment}
           />
         ))}
 
-        {!invoices?.length && (
+        {!filteredInvoices?.length && (
           <Card>
             <CardContent className="flex items-center justify-center h-64">
               <div className="text-center">
                 <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-foreground mb-2">Belum ada invoice</h3>
-                <p className="text-muted-foreground">Invoice akan muncul di sini setelah Anda membuatnya</p>
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' 
+                    ? 'No matching invoices found' 
+                    : 'Belum ada invoice'}
+                </h3>
+                <p className="text-muted-foreground">
+                  {searchTerm || statusFilter !== 'all' || typeFilter !== 'all'
+                    ? 'Try adjusting your search or filter criteria'
+                    : 'Invoice akan muncul di sini setelah Anda membuatnya'}
+                </p>
               </div>
             </CardContent>
           </Card>

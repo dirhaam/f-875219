@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Settings, Mail, Building, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import EmailTestDialog from './EmailTestDialog';
 
 const SettingsManager = () => {
   const queryClient = useQueryClient();
@@ -134,7 +134,10 @@ const SettingsManager = () => {
         <TabsContent value="email">
           <Card>
             <CardHeader>
-              <CardTitle>Konfigurasi Email SMTP</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Konfigurasi Email SMTP</CardTitle>
+                <EmailTestDialog emailConfig={settings?.email_config || {}} />
+              </div>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleEmailSubmit} className="space-y-4">
