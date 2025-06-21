@@ -4,12 +4,12 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { Send, CheckCircle } from 'lucide-react';
+import CustomerInfoSection from './order/CustomerInfoSection';
+import ServiceSelectionSection from './order/ServiceSelectionSection';
+import DownpaymentSection from './order/DownpaymentSection';
 
 interface OrderFormProps {
   onClose?: () => void;
@@ -101,7 +101,6 @@ const OrderForm = ({ onClose, preselectedServiceId }: OrderFormProps) => {
 
   const selectedService = services?.find(service => service.id === formData.service_id);
   const basePrice = formData.total_amount || selectedService?.price || 0;
-  const downpaymentAmount = useDownpayment ? (basePrice * formData.downpayment_percentage) / 100 : 0;
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
@@ -117,167 +116,24 @@ const OrderForm = ({ onClose, preselectedServiceId }: OrderFormProps) => {
       
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                Nama Lengkap *
-              </label>
-              <Input
-                type="text"
-                placeholder="Masukkan nama lengkap"
-                value={formData.customer_name}
-                onChange={(e) => handleInputChange('customer_name', e.target.value)}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                Email *
-              </label>
-              <Input
-                type="email"
-                placeholder="nama@email.com"
-                value={formData.customer_email}
-                onChange={(e) => handleInputChange('customer_email', e.target.value)}
-                required
-              />
-            </div>
-          </div>
+          <CustomerInfoSection 
+            formData={formData}
+            onInputChange={handleInputChange}
+          />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">
-              Nomor Telepon
-            </label>
-            <Input
-              type="tel"
-              placeholder="08123456789"
-              value={formData.customer_phone}
-              onChange={(e) => handleInputChange('customer_phone', e.target.value)}
-            />
-          </div>
+          <ServiceSelectionSection 
+            services={services}
+            formData={formData}
+            onInputChange={handleInputChange}
+          />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">
-              Pilih Layanan *
-            </label>
-            <Select 
-              value={formData.service_id} 
-              onValueChange={(value) => handleInputChange('service_id', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih layanan yang diinginkan" />
-              </SelectTrigger>
-              <SelectContent>
-                {services?.map((service) => (
-                  <SelectItem key={service.id} value={service.id}>
-                    {service.name} - Rp {service.price?.toLocaleString('id-ID')}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">
-              Total Harga Proyek (Rp)
-            </label>
-            <Input
-              type="number"
-              placeholder="Kosongkan jika menggunakan harga paket"
-              value={formData.total_amount || ''}
-              onChange={(e) => handleInputChange('total_amount', parseFloat(e.target.value) || 0)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Isi jika harga berbeda dari paket standar, atau kosongkan untuk menggunakan harga paket
-            </p>
-          </div>
-
-          <div className="space-y-4 border p-4 rounded-md">
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="use-downpayment" 
-                checked={useDownpayment}
-                onCheckedChange={setUseDownpayment}
-              />
-              <label htmlFor="use-downpayment" className="text-sm font-medium">
-                Saya ingin sistem pembayaran bertahap (DP)
-              </label>
-            </div>
-
-            {useDownpayment && (
-              <div className="space-y-3 pl-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
-                    Persentase DP (%)
-                  </label>
-                  <Select 
-                    value={formData.downpayment_percentage.toString()} 
-                    onValueChange={(value) => handleInputChange('downpayment_percentage', parseInt(value))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih persentase DP" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="20">20%</SelectItem>
-                      <SelectItem value="30">30%</SelectItem>
-                      <SelectItem value="40">40%</SelectItem>
-                      <SelectItem value="50">50%</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {formData.downpayment_percentage > 0 && basePrice > 0 && (
-                  <div className="bg-blue-50 p-3 rounded-md text-sm">
-                    <div className="flex justify-between mb-1">
-                      <span>Total Proyek:</span>
-                      <span className="font-medium">Rp {basePrice.toLocaleString('id-ID')}</span>
-                    </div>
-                    <div className="flex justify-between mb-1">
-                      <span>DP ({formData.downpayment_percentage}%):</span>
-                      <span className="font-medium text-blue-600">Rp {downpaymentAmount.toLocaleString('id-ID')}</span>
-                    </div>
-                    <div className="flex justify-between border-t pt-1">
-                      <span>Sisa Pembayaran:</span>
-                      <span className="font-medium">Rp {(basePrice - downpaymentAmount).toLocaleString('id-ID')}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">
-              Budget Range
-            </label>
-            <Select 
-              value={formData.budget_range} 
-              onValueChange={(value) => handleInputChange('budget_range', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih budget range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="< 5 juta">&lt; 5 juta</SelectItem>
-                <SelectItem value="5 - 10 juta">5 - 10 juta</SelectItem>
-                <SelectItem value="10 - 25 juta">10 - 25 juta</SelectItem>
-                <SelectItem value="25 - 50 juta">25 - 50 juta</SelectItem>
-                <SelectItem value="> 50 juta">&gt; 50 juta</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">
-              Target Deadline
-            </label>
-            <Input
-              type="date"
-              value={formData.deadline_date}
-              onChange={(e) => handleInputChange('deadline_date', e.target.value)}
-            />
-          </div>
+          <DownpaymentSection 
+            useDownpayment={useDownpayment}
+            setUseDownpayment={setUseDownpayment}
+            downpaymentPercentage={formData.downpayment_percentage}
+            onPercentageChange={(value) => handleInputChange('downpayment_percentage', value)}
+            basePrice={basePrice}
+          />
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">
