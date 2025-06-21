@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, FileText, Eye, Send, DollarSign, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateInvoicePDF } from '@/utils/invoicePdfGenerator';
@@ -16,6 +18,8 @@ const InvoicesManager = () => {
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<string>('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDownpayment, setIsDownpayment] = useState(false);
+  const [downpaymentPercentage, setDownpaymentPercentage] = useState(30);
 
   const { data: invoices, isLoading } = useQuery({
     queryKey: ['invoices'],
@@ -27,7 +31,9 @@ const InvoicesManager = () => {
           orders (
             customer_name,
             customer_email,
-            services (name)
+            services (name),
+            downpayment_percentage,
+            remaining_amount
           )
         `)
         .order('created_at', { ascending: false });
@@ -40,33 +46,24 @@ const InvoicesManager = () => {
   const { data: orders } = useQuery({
     queryKey: ['orders-for-invoice'],
     queryFn: async () => {
-      // First get all orders that are completed
-      const { data: completedOrders, error: ordersError } = await supabase
+      // Get all orders that are in_progress or completed
+      const { data: availableOrders, error: ordersError } = await supabase
         .from('orders')
         .select(`
           id,
           customer_name,
           customer_email,
-          services (name, price)
+          status,
+          services (name, price),
+          downpayment_percentage,
+          downpayment_amount,
+          remaining_amount,
+          total_amount
         `)
-        .eq('status', 'completed');
+        .in('status', ['in_progress', 'completed']);
       
       if (ordersError) throw ordersError;
-
-      // Then get all order IDs that already have invoices
-      const { data: invoicedOrders, error: invoicesError } = await supabase
-        .from('invoices')
-        .select('order_id');
-      
-      if (invoicesError) throw invoicesError;
-
-      // Filter out orders that already have invoices
-      const invoicedOrderIds = invoicedOrders?.map(inv => inv.order_id) || [];
-      const availableOrders = completedOrders?.filter(order => 
-        !invoicedOrderIds.includes(order.id)
-      ) || [];
-      
-      return availableOrders;
+      return availableOrders || [];
     }
   });
 
@@ -83,6 +80,21 @@ const InvoicesManager = () => {
         }]);
       
       if (error) throw error;
+
+      // Update order remaining amount if this is a downpayment
+      if (invoiceData.is_downpayment) {
+        const selectedOrderData = orders?.find(order => order.id === selectedOrder);
+        if (selectedOrderData) {
+          const remaining = (selectedOrderData.total_amount || selectedOrderData.services?.price || 0) - invoiceData.subtotal;
+          await supabase
+            .from('orders')
+            .update({ 
+              downpayment_amount: invoiceData.subtotal,
+              remaining_amount: remaining 
+            })
+            .eq('id', selectedOrder);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
@@ -90,6 +102,7 @@ const InvoicesManager = () => {
       toast.success('Invoice berhasil dibuat');
       setIsDialogOpen(false);
       setSelectedOrder('');
+      setIsDownpayment(false);
     },
     onError: () => {
       toast.error('Gagal membuat invoice');
@@ -131,7 +144,10 @@ const InvoicesManager = () => {
       tax_amount: taxAmount,
       total_amount: subtotal + taxAmount,
       payment_terms: formData.get('payment_terms'),
-      notes: formData.get('notes')
+      notes: formData.get('notes'),
+      is_downpayment: isDownpayment,
+      invoice_type: isDownpayment ? 'downpayment' : 'full',
+      downpayment_percentage: isDownpayment ? downpaymentPercentage : 0
     };
 
     createInvoiceMutation.mutate(invoiceData);
@@ -147,6 +163,14 @@ const InvoicesManager = () => {
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const calculateDownpaymentAmount = () => {
+    const selectedOrderData = orders?.find(order => order.id === selectedOrder);
+    if (!selectedOrderData) return 0;
+    
+    const baseAmount = selectedOrderData.total_amount || selectedOrderData.services?.price || 0;
+    return (baseAmount * downpaymentPercentage) / 100;
   };
 
   const handleDownloadPDF = async (invoice: any) => {
@@ -168,7 +192,7 @@ const InvoicesManager = () => {
           tax_number: '12.345.678.9-012.345'
         },
         items: [{
-          description: invoice.orders?.services?.name || 'Digital Service',
+          description: `${invoice.orders?.services?.name || 'Digital Service'}${invoice.is_downpayment ? ' (DP)' : ''}`,
           quantity: 1,
           price: invoice.subtotal,
           total: invoice.subtotal
@@ -211,7 +235,7 @@ const InvoicesManager = () => {
               Buat Invoice
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Buat Invoice Baru</DialogTitle>
             </DialogHeader>
@@ -220,24 +244,50 @@ const InvoicesManager = () => {
                 <label className="text-sm font-medium">Pilih Pesanan</label>
                 <Select value={selectedOrder} onValueChange={setSelectedOrder} required>
                   <SelectTrigger>
-                    <SelectValue placeholder="Pilih pesanan yang sudah selesai" />
+                    <SelectValue placeholder="Pilih pesanan" />
                   </SelectTrigger>
                   <SelectContent>
                     {orders?.map((order) => (
                       <SelectItem key={order.id} value={order.id}>
-                        {order.customer_name} - {order.services?.name}
+                        {order.customer_name} - {order.services?.name} ({order.status})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="downpayment" 
+                  checked={isDownpayment}
+                  onCheckedChange={setIsDownpayment}
+                />
+                <label htmlFor="downpayment" className="text-sm font-medium">
+                  Invoice Downpayment (DP)
+                </label>
+              </div>
+
+              {isDownpayment && (
+                <div>
+                  <label className="text-sm font-medium">Persentase DP (%)</label>
+                  <Input 
+                    type="number" 
+                    min="1" 
+                    max="100"
+                    value={downpaymentPercentage}
+                    onChange={(e) => setDownpaymentPercentage(parseInt(e.target.value) || 0)}
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="text-sm font-medium">Subtotal (Rp)</label>
                 <Input 
                   name="subtotal" 
                   type="number" 
-                  defaultValue={orders?.find(o => o.id === selectedOrder)?.services?.price || 0}
+                  value={isDownpayment ? calculateDownpaymentAmount() : orders?.find(o => o.id === selectedOrder)?.services?.price || 0}
                   required 
+                  readOnly={isDownpayment}
                 />
               </div>
               <div>
@@ -269,7 +319,12 @@ const InvoicesManager = () => {
           <Card key={invoice.id}>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{invoice.invoice_number}</CardTitle>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  {invoice.invoice_number}
+                  {invoice.is_downpayment && (
+                    <Badge variant="outline">DP {invoice.downpayment_percentage}%</Badge>
+                  )}
+                </CardTitle>
                 {getStatusBadge(invoice.status)}
               </div>
               <div className="text-sm text-muted-foreground">
@@ -296,6 +351,12 @@ const InvoicesManager = () => {
                   <span>Total:</span>
                   <span>Rp {invoice.total_amount?.toLocaleString('id-ID')}</span>
                 </div>
+                {invoice.is_downpayment && invoice.orders?.remaining_amount && (
+                  <div className="flex justify-between text-sm text-muted-foreground mt-2">
+                    <span>Sisa:</span>
+                    <span>Rp {invoice.orders.remaining_amount?.toLocaleString('id-ID')}</span>
+                  </div>
+                )}
               </div>
 
               {invoice.notes && (

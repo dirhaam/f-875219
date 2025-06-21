@@ -7,23 +7,29 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { Send, CheckCircle } from 'lucide-react';
 
 interface OrderFormProps {
   onClose?: () => void;
+  preselectedServiceId?: string;
 }
 
-const OrderForm = ({ onClose }: OrderFormProps) => {
+const OrderForm = ({ onClose, preselectedServiceId }: OrderFormProps) => {
   const [formData, setFormData] = useState({
     customer_name: '',
     customer_email: '',
     customer_phone: '',
-    service_id: '',
+    service_id: preselectedServiceId || '',
     custom_requirements: '',
     budget_range: '',
-    deadline_date: ''
+    deadline_date: '',
+    downpayment_percentage: 0,
+    total_amount: 0
   });
+
+  const [useDownpayment, setUseDownpayment] = useState(false);
 
   const { data: services } = useQuery({
     queryKey: ['services-for-order'],
@@ -40,9 +46,20 @@ const OrderForm = ({ onClose }: OrderFormProps) => {
 
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: typeof formData) => {
+      const selectedService = services?.find(s => s.id === orderData.service_id);
+      const totalAmount = orderData.total_amount || selectedService?.price || 0;
+      
+      const finalOrderData = {
+        ...orderData,
+        total_amount: totalAmount,
+        downpayment_percentage: useDownpayment ? orderData.downpayment_percentage : 0,
+        downpayment_amount: useDownpayment ? (totalAmount * orderData.downpayment_percentage) / 100 : 0,
+        remaining_amount: useDownpayment ? totalAmount - (totalAmount * orderData.downpayment_percentage) / 100 : 0
+      };
+
       const { error } = await supabase
         .from('orders')
-        .insert([orderData]);
+        .insert([finalOrderData]);
       
       if (error) throw error;
     },
@@ -52,11 +69,14 @@ const OrderForm = ({ onClose }: OrderFormProps) => {
         customer_name: '',
         customer_email: '',
         customer_phone: '',
-        service_id: '',
+        service_id: preselectedServiceId || '',
         custom_requirements: '',
         budget_range: '',
-        deadline_date: ''
+        deadline_date: '',
+        downpayment_percentage: 0,
+        total_amount: 0
       });
+      setUseDownpayment(false);
       if (onClose) onClose();
     },
     onError: () => {
@@ -75,9 +95,13 @@ const OrderForm = ({ onClose }: OrderFormProps) => {
     createOrderMutation.mutate(formData);
   };
 
-  const handleInputChange = (field: keyof typeof formData, value: string) => {
+  const handleInputChange = (field: keyof typeof formData, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  const selectedService = services?.find(service => service.id === formData.service_id);
+  const basePrice = formData.total_amount || selectedService?.price || 0;
+  const downpaymentAmount = useDownpayment ? (basePrice * formData.downpayment_percentage) / 100 : 0;
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
@@ -152,6 +176,75 @@ const OrderForm = ({ onClose }: OrderFormProps) => {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">
+              Total Harga Proyek (Rp)
+            </label>
+            <Input
+              type="number"
+              placeholder="Kosongkan jika menggunakan harga paket"
+              value={formData.total_amount || ''}
+              onChange={(e) => handleInputChange('total_amount', parseFloat(e.target.value) || 0)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Isi jika harga berbeda dari paket standar, atau kosongkan untuk menggunakan harga paket
+            </p>
+          </div>
+
+          <div className="space-y-4 border p-4 rounded-md">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="use-downpayment" 
+                checked={useDownpayment}
+                onCheckedChange={setUseDownpayment}
+              />
+              <label htmlFor="use-downpayment" className="text-sm font-medium">
+                Saya ingin sistem pembayaran bertahap (DP)
+              </label>
+            </div>
+
+            {useDownpayment && (
+              <div className="space-y-3 pl-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Persentase DP (%)
+                  </label>
+                  <Select 
+                    value={formData.downpayment_percentage.toString()} 
+                    onValueChange={(value) => handleInputChange('downpayment_percentage', parseInt(value))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih persentase DP" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="20">20%</SelectItem>
+                      <SelectItem value="30">30%</SelectItem>
+                      <SelectItem value="40">40%</SelectItem>
+                      <SelectItem value="50">50%</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {formData.downpayment_percentage > 0 && basePrice > 0 && (
+                  <div className="bg-blue-50 p-3 rounded-md text-sm">
+                    <div className="flex justify-between mb-1">
+                      <span>Total Proyek:</span>
+                      <span className="font-medium">Rp {basePrice.toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="flex justify-between mb-1">
+                      <span>DP ({formData.downpayment_percentage}%):</span>
+                      <span className="font-medium text-blue-600">Rp {downpaymentAmount.toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="flex justify-between border-t pt-1">
+                      <span>Sisa Pembayaran:</span>
+                      <span className="font-medium">Rp {(basePrice - downpaymentAmount).toLocaleString('id-ID')}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

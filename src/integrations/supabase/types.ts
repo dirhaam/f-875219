@@ -12,43 +12,80 @@ export type Database = {
       footer_content: {
         Row: {
           column_order: number | null
-          column_title: string
+          column_title: string | null
           created_at: string
           id: string
           is_enabled: boolean | null
-          links: string[] | null
+          link_text: string | null
+          link_url: string | null
+          parent_column: string | null
           updated_at: string
         }
         Insert: {
           column_order?: number | null
-          column_title: string
+          column_title?: string | null
           created_at?: string
           id?: string
           is_enabled?: boolean | null
-          links?: string[] | null
+          link_text?: string | null
+          link_url?: string | null
+          parent_column?: string | null
           updated_at?: string
         }
         Update: {
           column_order?: number | null
-          column_title?: string
+          column_title?: string | null
           created_at?: string
           id?: string
           is_enabled?: boolean | null
-          links?: string[] | null
+          link_text?: string | null
+          link_url?: string | null
+          parent_column?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      gdpr_consents: {
+        Row: {
+          consent_date: string | null
+          consent_given: boolean | null
+          id: string
+          ip_address: unknown | null
+          user_agent: string | null
+          user_session: string
+        }
+        Insert: {
+          consent_date?: string | null
+          consent_given?: boolean | null
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_session: string
+        }
+        Update: {
+          consent_date?: string | null
+          consent_given?: boolean | null
+          id?: string
+          ip_address?: unknown | null
+          user_agent?: string | null
+          user_session?: string
         }
         Relationships: []
       }
       invoices: {
         Row: {
           created_at: string
+          downpayment_percentage: number | null
           due_date: string
           id: string
           invoice_number: string
+          invoice_type: string | null
+          is_downpayment: boolean | null
           issue_date: string
           notes: string | null
           order_id: string | null
           payment_terms: string | null
+          related_invoice_id: string | null
           status: string | null
           subtotal: number
           tax_amount: number | null
@@ -56,13 +93,17 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          downpayment_percentage?: number | null
           due_date: string
           id?: string
           invoice_number: string
+          invoice_type?: string | null
+          is_downpayment?: boolean | null
           issue_date?: string
           notes?: string | null
           order_id?: string | null
           payment_terms?: string | null
+          related_invoice_id?: string | null
           status?: string | null
           subtotal: number
           tax_amount?: number | null
@@ -70,13 +111,17 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          downpayment_percentage?: number | null
           due_date?: string
           id?: string
           invoice_number?: string
+          invoice_type?: string | null
+          is_downpayment?: boolean | null
           issue_date?: string
           notes?: string | null
           order_id?: string | null
           payment_terms?: string | null
+          related_invoice_id?: string | null
           status?: string | null
           subtotal?: number
           tax_amount?: number | null
@@ -88,6 +133,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_related_invoice_id_fkey"
+            columns: ["related_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
         ]
@@ -136,9 +188,12 @@ export type Database = {
           customer_name: string
           customer_phone: string | null
           deadline_date: string | null
+          downpayment_amount: number | null
+          downpayment_percentage: number | null
           id: string
           notes: string | null
           order_date: string
+          remaining_amount: number | null
           service_id: string | null
           status: string | null
           total_amount: number | null
@@ -150,9 +205,12 @@ export type Database = {
           customer_name: string
           customer_phone?: string | null
           deadline_date?: string | null
+          downpayment_amount?: number | null
+          downpayment_percentage?: number | null
           id?: string
           notes?: string | null
           order_date?: string
+          remaining_amount?: number | null
           service_id?: string | null
           status?: string | null
           total_amount?: number | null
@@ -164,9 +222,12 @@ export type Database = {
           customer_name?: string
           customer_phone?: string | null
           deadline_date?: string | null
+          downpayment_amount?: number | null
+          downpayment_percentage?: number | null
           id?: string
           notes?: string | null
           order_date?: string
+          remaining_amount?: number | null
           service_id?: string | null
           status?: string | null
           total_amount?: number | null
